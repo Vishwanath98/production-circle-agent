@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Vishwanath98/production-circle-agent/blob/main/docs/schemas/action-envelope.schema.json",
+  "title": "Action Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action_id", "action_version", "organization_id", "actor_id", "thread_id", "action_type", "tool_name", "provider", "resource_ids", "normalized_arguments", "redacted_arguments", "risk_level", "policy_version", "action_digest", "idempotency_key", "status"],
+  "properties": {
+    "action_id": {"type": "string", "pattern": "^act_"},
+    "action_version": {"type": "integer", "minimum": 1},
+    "organization_id": {"type": "string", "minLength": 1},
+    "actor_id": {"type": "string", "minLength": 1},
+    "thread_id": {"type": "string", "minLength": 1},
+    "action_type": {"type": "string", "minLength": 1},
+    "tool_name": {"type": "string", "minLength": 1},
+    "provider": {"type": "string", "minLength": 1},
+    "resource_ids": {"type": "object"},
+    "normalized_arguments": {"type": "object"},
+    "redacted_arguments": {"type": "object"},
+    "risk_level": {"enum": ["low", "medium", "high", "critical"]},
+    "policy_version": {"type": "string"},
+    "action_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "idempotency_key": {"type": "string", "minLength": 1},
+    "status": {"enum": ["proposed", "denied", "pending_approval", "approved", "executing", "submitted", "succeeded", "failed", "cancelled"]},
+    "expires_at": {"type": ["string", "null"], "format": "date-time"}
+  }
+}

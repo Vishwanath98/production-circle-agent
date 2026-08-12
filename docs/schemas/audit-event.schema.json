@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Vishwanath98/production-circle-agent/blob/main/docs/schemas/audit-event.schema.json",
+  "title": "Audit Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event_id", "timestamp", "request_id", "run_id", "thread_id", "organization_id", "principal_id", "event_type", "resource_type", "resource_id", "outcome", "reason_code", "safe_details", "trace_id"],
+  "properties": {
+    "event_id": {"type": "string", "pattern": "^evt_"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "request_id": {"type": "string"},
+    "run_id": {"type": "string"},
+    "thread_id": {"type": "string"},
+    "organization_id": {"type": "string"},
+    "principal_id": {"type": "string"},
+    "event_type": {"type": "string"},
+    "resource_type": {"type": "string"},
+    "resource_id": {"type": "string"},
+    "outcome": {"type": "string"},
+    "reason_code": {"type": "string"},
+    "safe_details": {"type": "object"},
+    "trace_id": {"type": "string"}
+  }
+}

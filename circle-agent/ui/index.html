@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Circle Agent Operations</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <header>
+    <div>
+      <p class="eyebrow">LOCAL LAB · TESTNET SAFE</p>
+      <h1>Circle Agent Operations</h1>
+    </div>
+    <div id="identity" class="identity">Signed out</div>
+  </header>
+
+  <main>
+    <section id="login-panel" class="panel login-panel">
+      <h2>Authenticate</h2>
+      <p>Use a local development token created by <code>setup_local.py</code>. The token is exchanged for an HttpOnly browser session.</p>
+      <form id="login-form">
+        <label for="token">Development token</label>
+        <input id="token" name="token" type="password" autocomplete="off" required>
+        <button type="submit">Sign In</button>
+      </form>
+      <p id="login-error" class="error" role="alert"></p>
+    </section>
+
+    <section id="workspace" class="workspace hidden">
+      <aside class="panel sidebar">
+        <div class="panel-heading">
+          <h2>Threads</h2>
+          <button id="new-thread" class="secondary">New</button>
+        </div>
+        <label for="profile">Capability profile</label>
+        <select id="profile">
+          <option value="core-sim">Core simulator</option>
+          <option value="rag-sim">RAG simulator</option>
+          <option value="mcp-sim">MCP simulator</option>
+          <option value="full-sim" selected>Full simulator</option>
+          <option value="full-testnet">Full Circle testnet</option>
+          <option value="x402-testnet">x402 testnet</option>
+        </select>
+        <nav id="threads" aria-label="Conversation threads"></nav>
+      </aside>
+
+      <section class="panel chat-panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">TENANT-SCOPED</p>
+            <h2 id="thread-title">New conversation</h2>
+          </div>
+          <span id="run-status" class="status">Ready</span>
+        </div>
+        <div id="messages" class="messages" aria-live="polite"></div>
+        <div id="approval-notice" class="approval-notice hidden"></div>
+        <form id="chat-form" class="chat-form">
+          <label for="message">Message</label>
+          <textarea id="message" rows="3" placeholder="Ask for a balance, policy, or a test transfer..." required></textarea>
+          <button type="submit">Send</button>
+        </form>
+      </section>
+
+      <aside class="panel approvals-panel">
+        <div class="panel-heading">
+          <h2>Approval inbox</h2>
+          <button id="refresh-approvals" class="secondary">Refresh</button>
+        </div>
+        <p class="muted">Only authorized reviewers can load and decide approvals.</p>
+        <div id="approvals"></div>
+      </aside>
+    </section>
+  </main>
+
+  <script src="/assets/app.js"></script>
+</body>
+</html>

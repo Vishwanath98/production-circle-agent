@@ -1,0 +1,37 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install Circle and shared dependencies
+        run: python -m pip install -e agent-spine -r circle-agent/requirements.txt
+      - name: Shared foundation tests
+        env:
+          PYTHONPATH: agent-spine:circle-agent
+        run: python -m unittest discover -s agent-spine/tests -v
+      - name: Circle tests
+        env:
+          PYTHONPATH: agent-spine:circle-agent
+        run: python -m unittest discover -s circle-agent/tests -v
+      - name: Onboarding tests
+        env:
+          PYTHONPATH: agent-spine:onboarding-agent
+        run: python -m unittest discover -s onboarding-agent/tests -v
+      - name: Compile Python
+        env:
+          PYTHONPYCACHEPREFIX: /tmp/production-circle-agent-pycache
+        run: python -m compileall -q agent-spine/agent_spine circle-agent/circle_agent onboarding-agent/onboarding_agent

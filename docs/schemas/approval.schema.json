@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Vishwanath98/production-circle-agent/blob/main/docs/schemas/approval.schema.json",
+  "title": "Approval Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["approval_id", "action_id", "action_version", "action_digest", "organization_id", "status", "required_roles", "required_count", "requested_at", "expires_at"],
+  "properties": {
+    "approval_id": {"type": "string", "pattern": "^apr_"},
+    "action_id": {"type": "string", "pattern": "^act_"},
+    "action_version": {"type": "integer", "minimum": 1},
+    "action_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "organization_id": {"type": "string"},
+    "status": {"enum": ["pending", "approved", "rejected", "expired", "cancelled"]},
+    "required_roles": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+    "required_count": {"type": "integer", "minimum": 1},
+    "requested_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"}
+  }
+}

@@ -1,0 +1,7 @@
+langchain-core==0.3.28
+langgraph==0.2.60
+langchain-openai==0.2.14
+langchain-anthropic==0.3.0
+langsmith==0.2.11
+python-dotenv==1.0.1
+mcp==2.0.0

@@ -1,0 +1,17 @@
+{
+  "servers": [
+    {
+      "name": "circle-risk",
+      "enabled": true,
+      "command": "${PYTHON}",
+      "args": ["./circle_agent/mcp_server.py"],
+      "cwd": ".",
+      "allowed_tools": ["validate_address", "sanctions_screen", "chain_analytics"],
+      "profiles": ["mcp-sim", "full-sim", "full-testnet", "x402-testnet"],
+      "permission": "mcp:read",
+      "risk": "medium",
+      "timeout_seconds": 15,
+      "environment": {}
+    }
+  ]
+}

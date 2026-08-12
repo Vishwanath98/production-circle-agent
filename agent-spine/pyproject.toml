@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-spine"
+version = "0.1.0"
+description = "Shared tenant-safe runtime for stateful agents, approvals, RAG, MCP, and audit."
+requires-python = ">=3.10"
+dependencies = [
+    "langsmith>=0.2.4",
+    "langgraph-checkpoint-sqlite>=2.0,<3.0",
+]
+
+[project.optional-dependencies]
+mcp = [
+    "langchain-core>=0.3.28,<0.4",
+    "mcp==2.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["agent_spine*"]

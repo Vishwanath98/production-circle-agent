@@ -1,0 +1,370 @@
+openapi: 3.1.0
+info:
+  title: Circle Production Lab API
+  version: 1.0.0-local
+  description: Tenant-safe native, compatibility, and OpenAI-compatible surfaces for the local Circle agent lab.
+servers:
+  - url: http://127.0.0.1:8086
+    description: Local loopback only
+tags:
+  - name: Runtime
+  - name: Sessions
+  - name: Threads
+  - name: Approvals
+  - name: Transactions
+  - name: Policy
+  - name: Webhooks
+  - name: Compatibility
+paths:
+  /healthz:
+    get:
+      tags: [Runtime]
+      security: []
+      responses:
+        '200': {description: Process is alive, content: {application/json: {schema: {$ref: '#/components/schemas/Status'}}}}
+  /readyz:
+    get:
+      tags: [Runtime]
+      security: []
+      responses:
+        '200': {description: Durable store is reachable, content: {application/json: {schema: {$ref: '#/components/schemas/Status'}}}}
+  /api/v1/sessions:
+    post:
+      tags: [Sessions]
+      security: []
+      description: Exchange a local development token for an HttpOnly session cookie and CSRF token.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties: {token: {type: string, writeOnly: true}}
+      responses:
+        '201':
+          description: Session created
+          headers: {Set-Cookie: {schema: {type: string}}}
+          content: {application/json: {schema: {$ref: '#/components/schemas/Session'}}}
+        '401': {$ref: '#/components/responses/Unauthenticated'}
+  /api/v1/sessions/current:
+    delete:
+      tags: [Sessions]
+      security: [{cookieSession: []}]
+      parameters: [{$ref: '#/components/parameters/Csrf'}]
+      responses: {'200': {description: Session revoked}}
+  /api/v1/me:
+    get:
+      tags: [Sessions]
+      responses:
+        '200': {description: Current principal, content: {application/json: {schema: {$ref: '#/components/schemas/PrincipalResponse'}}}}
+  /api/v1/threads:
+    get:
+      tags: [Threads]
+      responses:
+        '200': {description: Current principal's tenant-scoped threads, content: {application/json: {schema: {$ref: '#/components/schemas/ThreadList'}}}}
+    post:
+      tags: [Threads]
+      parameters: [{$ref: '#/components/parameters/Csrf'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                thread_id: {type: string}
+                title: {type: string, maxLength: 160}
+                profile: {$ref: '#/components/schemas/Profile'}
+      responses:
+        '201': {description: Thread created, content: {application/json: {schema: {$ref: '#/components/schemas/Thread'}}}}
+  /api/v1/threads/{thread_id}/messages:
+    parameters:
+      - name: thread_id
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: [Threads]
+      responses:
+        '200': {description: Thread messages, content: {application/json: {schema: {$ref: '#/components/schemas/MessageList'}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [Threads]
+      parameters: [{$ref: '#/components/parameters/Csrf'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: {type: string, minLength: 1}
+                profile: {$ref: '#/components/schemas/Profile'}
+      responses:
+        '200': {description: Completed or paused run, content: {application/json: {schema: {$ref: '#/components/schemas/RunResponse'}}}}
+  /api/v1/approvals:
+    get:
+      tags: [Approvals]
+      description: Requires circle:approval:decide; returns this tenant only.
+      parameters:
+        - name: status
+          in: query
+          schema: {type: string, default: pending}
+      responses:
+        '200': {description: Approval inbox, content: {application/json: {schema: {type: object, properties: {items: {type: array, items: {$ref: '#/components/schemas/Approval'}}}}}}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /api/v1/approvals/{approval_id}/decisions:
+    post:
+      tags: [Approvals]
+      description: Decide an exact action digest and resume its original thread after approval.
+      parameters:
+        - name: approval_id
+          in: path
+          required: true
+          schema: {type: string}
+        - $ref: '#/components/parameters/Csrf'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: {enum: [approve, reject]}
+                reason: {type: string}
+      responses:
+        '200': {description: Decision persisted and, for approval, graph resumed}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {description: Original actor or thread unavailable}
+  /api/v1/transactions/{transaction_id}:
+    get:
+      tags: [Transactions]
+      parameters:
+        - name: transaction_id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Tenant-scoped normalized transaction, content: {application/json: {schema: {$ref: '#/components/schemas/Transaction'}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/v1/events:
+    get:
+      tags: [Runtime]
+      description: Finite SSE snapshot of authorized audit events for a thread.
+      parameters:
+        - name: thread_id
+          in: query
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: Audit events, content: {text/event-stream: {schema: {type: string}}}}
+  /api/v1/documents:
+    get:
+      tags: [Policy]
+      description: Requires policy:read; includes global and current-tenant metadata.
+      responses: {'200': {description: Authorized documents}}
+    post:
+      tags: [Policy]
+      description: Requires policy:write; tenant is always the authenticated tenant.
+      parameters: [{$ref: '#/components/parameters/Csrf'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [source_name, version, content]
+              properties:
+                source_name: {type: string}
+                version: {type: string}
+                content: {type: string}
+      responses: {'201': {description: Document version and chunks persisted}}
+  /api/v1/memories:
+    get:
+      tags: [Threads]
+      description: List the current principal's active, unexpired explicit memories.
+      parameters:
+        - {name: thread_id, in: query, schema: {type: string}}
+      responses: {'200': {description: Principal-scoped memories}}
+    post:
+      tags: [Threads]
+      parameters: [{$ref: '#/components/parameters/Csrf'}]
+      description: Persist an explicit user note; memories are never inferred silently.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [thread_id, content]
+              properties:
+                thread_id: {type: string}
+                memory_type: {type: string, default: user_note}
+                content: {type: string}
+                sensitivity: {enum: [private, internal], default: private}
+                expires_at: {type: string, format: date-time}
+      responses: {'201': {description: Memory persisted}}
+  /api/v1/memories/{memory_id}:
+    delete:
+      tags: [Threads]
+      parameters:
+        - {name: memory_id, in: path, required: true, schema: {type: string}}
+        - $ref: '#/components/parameters/Csrf'
+      responses: {'200': {description: Memory soft-deleted}, '404': {$ref: '#/components/responses/NotFound'}}
+  /api/v1/webhooks/circle:
+    post:
+      tags: [Webhooks]
+      security: []
+      description: ECDSA-verified Circle V2 webhook. Tenant comes from a server-side subscription mapping.
+      parameters:
+        - {name: X-Circle-Signature, in: header, required: true, schema: {type: string}}
+        - {name: X-Circle-Key-Id, in: header, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {type: object}}}
+      responses:
+        '200': {description: Processed or duplicate}
+        '400': {description: Invalid signature, payload, or unknown subscription}
+  /chat:
+    post:
+      tags: [Compatibility]
+      description: Scrimmage-compatible endpoint using the same native runtime.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                thread_id: {type: string}
+                profile: {$ref: '#/components/schemas/Profile'}
+                message: {type: string}
+      responses: {'200': {description: Agent run, content: {application/json: {schema: {$ref: '#/components/schemas/RunResponse'}}}}}
+  /v1/chat/completions:
+    post:
+      tags: [Compatibility]
+      description: Minimal OpenAI-compatible chat shape; model selects a Circle capability profile.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [messages]
+              properties:
+                model: {$ref: '#/components/schemas/Profile'}
+                thread_id: {type: string}
+                stream: {type: boolean, default: false}
+                messages: {type: array, items: {type: object, required: [role, content], properties: {role: {type: string}, content: {type: string}}}}
+      responses: {'200': {description: JSON completion or SSE chunks with Circle approval extension}}
+security:
+  - bearerAuth: []
+  - cookieSession: []
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer}
+    cookieSession: {type: apiKey, in: cookie, name: circle_session}
+  parameters:
+    Csrf:
+      name: X-CSRF-Token
+      in: header
+      required: false
+      description: Required for cookie-authenticated mutations; bearer requests do not need it.
+      schema: {type: string}
+  responses:
+    Unauthenticated: {description: Missing or invalid authentication, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Forbidden: {description: Authenticated but unauthorized, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    NotFound: {description: Missing or outside the caller's visibility, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+  schemas:
+    Profile:
+      type: string
+      enum: [core-sim, rag-sim, mcp-sim, full-sim, full-testnet, x402-testnet]
+    Status:
+      type: object
+      properties: {status: {type: string}}
+    Principal:
+      type: object
+      required: [principal_id, organization_id, roles, scopes]
+      properties:
+        principal_id: {type: string}
+        organization_id: {type: string}
+        display_name: {type: string}
+        roles: {type: array, items: {type: string}}
+        scopes: {type: array, items: {type: string}}
+        auth_method: {type: string}
+    PrincipalResponse:
+      type: object
+      properties: {principal: {$ref: '#/components/schemas/Principal'}}
+    Session:
+      type: object
+      properties:
+        csrf_token: {type: string}
+        principal: {$ref: '#/components/schemas/Principal'}
+    Thread:
+      type: object
+      properties:
+        thread_id: {type: string}
+        organization_id: {type: string, readOnly: true}
+        principal_id: {type: string, readOnly: true}
+        profile: {$ref: '#/components/schemas/Profile'}
+        title: {type: string}
+    ThreadList:
+      type: object
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Thread'}}}
+    Message:
+      type: object
+      properties:
+        message_id: {type: string}
+        role: {enum: [user, assistant]}
+        content: {type: string}
+        run_id: {type: string}
+        created_at: {type: string, format: date-time}
+    MessageList:
+      type: object
+      properties: {items: {type: array, items: {$ref: '#/components/schemas/Message'}}}
+    Approval:
+      type: object
+      properties:
+        approval_id: {type: string}
+        action_id: {type: string}
+        action_digest: {type: string}
+        status: {enum: [pending, approved, rejected, expired, cancelled]}
+        required_roles: {type: array, items: {type: string}}
+        redacted_arguments: {type: object}
+        expires_at: {type: string, format: date-time}
+    Transaction:
+      type: object
+      properties:
+        transaction_id: {type: string}
+        provider: {type: string}
+        provider_reference: {type: string}
+        provider_status: {type: string}
+        normalized_status: {enum: [pending, submitted, confirmed, failed, denied, cancelled, stuck]}
+        amount: {type: string}
+        asset: {type: string}
+        chain: {type: string}
+        destination: {type: string}
+    RunResponse:
+      type: object
+      required: [request_id, run_id, thread_id, profile, status, message]
+      properties:
+        request_id: {type: string}
+        run_id: {type: string}
+        thread_id: {type: string}
+        profile: {$ref: '#/components/schemas/Profile'}
+        status: {enum: [completed, approval_required, failed]}
+        message: {type: string}
+        approval: {oneOf: [{$ref: '#/components/schemas/Approval'}, {type: 'null'}]}
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: {type: string}
+            message: {type: string}
+            request_id: {type: string}

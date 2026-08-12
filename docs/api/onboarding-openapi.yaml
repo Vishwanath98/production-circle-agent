@@ -1,0 +1,69 @@
+openapi: 3.1.0
+info:
+  title: Onboarding Production Lab API
+  version: 1.0.0-local
+servers: [{url: 'http://127.0.0.1:8087'}]
+security: [{bearerAuth: []}]
+paths:
+  /healthz:
+    get:
+      security: []
+      responses: {'200': {description: Process is alive}}
+  /readyz:
+    get:
+      security: []
+      responses: {'200': {description: Durable store is reachable}}
+  /chat:
+    post:
+      description: Run or continue an authenticated onboarding thread.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                thread_id: {type: string}
+                profile: {enum: [core-sim, rag-sim, mcp-sim, full-sim]}
+                message: {type: string}
+      responses:
+        '200':
+          description: Completed or approval-required run
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  thread_id: {type: string}
+                  run_id: {type: string}
+                  status: {enum: [completed, approval_required, failed]}
+                  message: {type: string}
+                  approval: {type: [object, 'null']}
+  /api/v1/approvals:
+    get:
+      description: Pending tenant approvals; requires onboarding:approval:decide.
+      responses: {'200': {description: Approval list}, '403': {description: Forbidden}}
+  /api/v1/approvals/{approval_id}/decisions:
+    post:
+      parameters:
+        - {name: approval_id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: {enum: [approve, reject]}
+                reason: {type: string}
+      responses: {'200': {description: Decision persisted and approval resumed}}
+  /api/v1/applications/{application_id}:
+    get:
+      parameters:
+        - {name: application_id, in: path, required: true, schema: {type: string}}
+      responses: {'200': {description: Tenant-scoped application}, '404': {description: Not found or not visible}}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer}
