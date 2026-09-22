@@ -55,6 +55,7 @@ class MCPGateway:
         for server in servers:
             if not server.get('enabled', False):
                 continue
+            url = str(server.get('url') or '')
             command = server.get('command')
             args = list(server.get('args') or [])
             cwd = server.get('cwd') or base_dir
@@ -67,9 +68,19 @@ class MCPGateway:
                 if value.startswith('./'):
                     value = os.path.abspath(os.path.join(base_dir, value))
                 resolved_args.append(value)
+            headers = {}
+            for name, value in dict(server.get('headers') or {}).items():
+                value = str(value)
+                if value.startswith('${') and value.endswith('}'):
+                    env_name = value[2:-1]
+                    value = os.environ.get(env_name, '')
+                    if not value:
+                        raise ValueError('MCP header environment variable is not set: %s' % env_name)
+                headers[name] = value
             client = MCPToolClient(
                 timeout=float(server.get('timeout_seconds', 15)), command=command,
                 args=resolved_args, cwd=cwd, env=dict(server.get('environment') or {}),
+                url=url, headers=headers,
             )
             self.clients.append(client)
             available = client.describe_tools()

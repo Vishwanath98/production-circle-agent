@@ -1,9 +1,8 @@
 # agents/mcp_client.py
 #
-# Sync bridge to an MCP stdio server. The MCP SDK is async; LangGraph nodes here
-# are sync, so this runs a dedicated asyncio event loop on a background thread
-# and opens ONE persistent client session (one server subprocess) for the whole
-# process. Nodes call .call(tool, args) synchronously.
+# Sync bridge to an MCP stdio or Streamable HTTP server. The MCP SDK is async;
+# LangGraph nodes here are sync, so this runs a dedicated asyncio event loop on
+# a background thread and opens one persistent client session for the process.
 
 import asyncio
 import json
@@ -12,8 +11,11 @@ import threading
 from contextlib import AsyncExitStack
 from typing import Optional
 
+import httpx2
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamable_http_client
 
 
 async def stack_close(stack):
@@ -24,14 +26,20 @@ async def stack_close(stack):
 
 class MCPToolClient:
     def __init__(self, server_script=None, timeout=30.0, command=None, args=None,
-                 cwd=None, env=None):
+                 cwd=None, env=None, url='', headers=None):
         self._timeout = timeout
         if server_script and not command:
             command = sys.executable
             args = [server_script]
-        if not command:
-            raise ValueError('an MCP command is required')
-        self._params = StdioServerParameters(command=command, args=list(args or []), cwd=cwd, env=env)
+        if command and url:
+            raise ValueError('configure an MCP command or URL, not both')
+        if not command and not url:
+            raise ValueError('an MCP command or URL is required')
+        self._url = url
+        self._headers = dict(headers or {})
+        self._params = None
+        if command:
+            self._params = StdioServerParameters(command=command, args=list(args or []), cwd=cwd, env=env)
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._loop.run_forever, daemon=True)
         self._thread.start()
@@ -44,7 +52,19 @@ class MCPToolClient:
 
     async def _connect(self):
         self._stack = AsyncExitStack()
-        read, write = await self._stack.enter_async_context(stdio_client(self._params))
+        if self._url:
+            http_client = None
+            if self._headers:
+                http_client = await self._stack.enter_async_context(
+                    httpx2.AsyncClient(headers=self._headers),
+                )
+            streams = await self._stack.enter_async_context(
+                streamable_http_client(self._url, http_client=http_client),
+            )
+            read = streams[0]
+            write = streams[1]
+        else:
+            read, write = await self._stack.enter_async_context(stdio_client(self._params))
         self._session = await self._stack.enter_async_context(ClientSession(read, write))
         await self._session.initialize()
 
