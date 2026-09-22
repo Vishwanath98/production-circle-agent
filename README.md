@@ -150,6 +150,7 @@ Circle testnet certification.
 - [Architecture](docs/adlc/architecture.md)
 - [Security and tenant isolation](docs/adlc/security-and-tenancy.md)
 - [Tools, tracing, and MCP](docs/adlc/tools-tracing-and-mcp.md)
+- [External Circle MCP and capture/replay setup](circle-agent/README.md#external-circle-mcp)
 - [RAG design](docs/adlc/rag.md)
 - [x402 and A2A placement](docs/adlc/x402-and-a2a.md)
 - [Testing strategy](docs/adlc/testing.md)
