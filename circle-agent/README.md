@@ -71,6 +71,19 @@ The default `mcp_servers.json` starts a deterministic local stdio server. To
 keep those risk tools and also exercise a real external MCP integration, use
 Circle's official Streamable HTTP server with the additive configuration:
 
+| Server | Transport | Tools | External traffic |
+|---|---|---:|---:|
+| `circle-risk` | Local stdio | 3 | No |
+| `circle-docs` | Streamable HTTP | 4 | Yes |
+
+The external tools search Circle documentation, return product summaries, list
+available SDK resources, and retrieve SDK resource details. They are useful for
+current product capabilities, supported networks, and implementation guidance.
+They do not read wallets or execute transactions.
+
+The external configuration is optional so the normal test suite and default
+local setup remain deterministic. Enable it with `CIRCLE_MCP_CONFIG`:
+
 ```bash
 PYTHONPATH=agent-spine:circle-agent \
   LLM_PROVIDER=openai \
@@ -80,8 +93,83 @@ PYTHONPATH=agent-spine:circle-agent \
   .venv/bin/python circle-agent/serve.py
 ```
 
-The external server exposes allowlisted, read-only tools for Circle
-documentation search, product summaries, and SDK coding resources. It does not
-read wallets or execute transactions. Use `full-testnet` when the same run must
-also exercise the separate Circle Wallet HTTPS API. HTTP proxy environment
-variables can route both external connections through a capture/replay proxy.
+Use a tool-capable model for normal model-driven selection of the external MCP
+tools. `LLM_PROVIDER=fake` keeps tests offline but does not select documentation
+tools from natural-language questions.
+
+## Full testnet and external MCP
+
+Keep credentials in the ignored `.env.local` file. The application does not
+load that file automatically; source it in the shell before starting the
+server.
+
+```bash
+export LLM_PROVIDER=openai
+export OPENAI_BASE_URL=http://127.0.0.1:1234/v1
+export OPENAI_MODEL=local-model
+export OPENAI_API_KEY=local-development
+
+export CIRCLE_MCP_CONFIG=circle-agent/mcp_servers.external.json
+export CIRCLE_API_HOST=https://api.circle.com
+export CIRCLE_API_KEY=TEST_REPLACE
+export CIRCLE_ENTITY_SECRET=REPLACE
+export CIRCLE_TESTNET_USDC_TOKEN_ID=REPLACE
+export CIRCLE_TESTNET_DESTINATION_ALLOWLIST=0xREPLACE
+```
+
+The seeded `wallet-treasury` is a simulator record. Map it to an existing
+Circle developer-controlled testnet wallet before using `full-testnet`:
+
+```bash
+sqlite3 .local/data/circle.sqlite "
+UPDATE wallets
+SET provider = 'circle-testnet',
+    provider_wallet_id = 'REPLACE_CIRCLE_WALLET_ID',
+    address = 'REPLACE_WALLET_ADDRESS',
+    chain = 'base',
+    asset = 'USDC',
+    updated_at = datetime('now')
+WHERE organization_id = 'org-acme'
+  AND wallet_id = 'wallet-treasury';
+"
+```
+
+Load the configuration and start the agent:
+
+```bash
+set -a
+source .env.local
+set +a
+
+PYTHONPATH=agent-spine:circle-agent .venv/bin/python circle-agent/serve.py
+```
+
+Open `http://127.0.0.1:8086`, sign in with the `org-acme` requester token, and
+select `full-testnet`. Use the matching reviewer token to approve a transfer.
+The resulting run can call both the external Circle MCP server and the Circle
+Wallet HTTPS API. There is no mainnet profile or automatic simulator fallback.
+
+## Capture and replay proxy
+
+Start Hoverfly or another HTTP capture/replay proxy, then export its proxy URL
+before starting the agent. For HTTPS interception, configure the Python runtime
+to trust the proxy's generated CA certificate.
+
+```bash
+export HTTP_PROXY=http://127.0.0.1:8500
+export HTTPS_PROXY=http://127.0.0.1:8500
+export SSL_CERT_FILE=/absolute/path/to/hoverfly-ca.pem
+export REQUESTS_CA_BUNDLE=/absolute/path/to/hoverfly-ca.pem
+```
+
+The proxy can capture:
+
+- Circle MCP Streamable HTTP initialization, tool discovery, calls, and results.
+- Circle Wallet balance lookup, transfer submission, and transaction lookup.
+- Circle webhook public-key lookup.
+
+The proxy cannot capture the local `circle-risk` stdio messages. Incoming
+Circle webhooks are also outside an outbound proxy and should be recorded as
+separate inbound fixtures. Redact authorization headers, API keys, entity-secret
+material, and encrypted signing material before sharing captures. Normalize
+request IDs and idempotency values when strict replay matching is not required.
