@@ -1,0 +1,33 @@
+{
+  "servers": [
+    {
+      "name": "circle-risk",
+      "enabled": true,
+      "command": "${PYTHON}",
+      "args": ["./circle_agent/mcp_server.py"],
+      "cwd": ".",
+      "allowed_tools": ["validate_address", "sanctions_screen", "chain_analytics"],
+      "profiles": ["mcp-sim", "full-sim", "full-testnet", "x402-testnet"],
+      "permission": "mcp:read",
+      "risk": "medium",
+      "timeout_seconds": 15,
+      "environment": {}
+    },
+    {
+      "name": "circle-docs",
+      "enabled": true,
+      "url": "https://api.circle.com/v1/codegen/mcp",
+      "allowed_tools": [
+        "search_circle_documentation",
+        "get_circle_product_summary",
+        "list_available_coding_resources",
+        "get_coding_resource_details"
+      ],
+      "profiles": ["mcp-sim", "full-sim", "full-testnet", "x402-testnet"],
+      "permission": "mcp:read",
+      "risk": "low",
+      "timeout_seconds": 30,
+      "headers": {}
+    }
+  ]
+}

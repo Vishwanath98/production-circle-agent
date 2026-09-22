@@ -1,8 +1,10 @@
+import json
 import os
 import tempfile
 import unittest
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from langchain_core.tools import tool
@@ -13,6 +15,7 @@ from agent_spine.approvals import approval_decide, approval_make
 from agent_spine.auth import AuthenticationError, AuthorizationError, Principal, resolve_principal
 from agent_spine.checkpointer import default_db_path, get_checkpointer
 from agent_spine.context import RuntimeContext, config_make, context_from_config
+from agent_spine.mcp_gateway import MCPGateway
 from agent_spine.model import config_from_env
 from agent_spine.policy import POLICY_VERSION, action_evaluate
 from agent_spine.store import Store
@@ -263,6 +266,41 @@ class FoundationTest(unittest.TestCase):
         self.assertEqual(config.provider, 'openai')
         self.assertEqual(config.model, 'local-test-model')
         self.assertEqual(config.api_key, 'local-development')
+
+    def test_mcp_gateway_loads_allowlisted_streamable_http_tools(self):
+        config_path = os.path.join(self.temp_dir.name, 'mcp.json')
+        config = {
+            'servers': [{
+                'name': 'circle-docs',
+                'enabled': True,
+                'url': 'https://api.circle.com/v1/codegen/mcp',
+                'allowed_tools': ['search_circle_documentation'],
+                'profiles': ['full-sim'],
+                'permission': 'mcp:read',
+                'timeout_seconds': 30,
+            }],
+        }
+        with open(config_path, 'wt') as f:
+            json.dump(config, f)
+        specification = SimpleNamespace(
+            name='search_circle_documentation',
+            description='Search Circle documentation.',
+            input_schema={
+                'type': 'object',
+                'properties': {'query': {'type': 'string'}},
+                'required': ['query'],
+            },
+        )
+        client = SimpleNamespace(describe_tools=lambda: [specification], close=lambda: None)
+
+        with patch('agent_spine.mcp_gateway.MCPToolClient', return_value=client) as client_class:
+            tools = MCPGateway(config_path).load()
+
+        call = client_class.call_args.kwargs
+        self.assertEqual(call['url'], 'https://api.circle.com/v1/codegen/mcp')
+        self.assertEqual(call['command'], None)
+        self.assertEqual(tools[0]['tool'].name, 'mcp_circle_docs_search_circle_documentation')
+        self.assertEqual(tools[0]['profiles'], ['full-sim'])
 
 
 if __name__ == '__main__':

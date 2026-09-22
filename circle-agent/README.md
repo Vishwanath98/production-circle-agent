@@ -64,3 +64,24 @@ curl -s http://127.0.0.1:8086/chat \
 The API contract is in [`../docs/api/openapi.yaml`](../docs/api/openapi.yaml).
 The build map, security model, ADRs, testing gates, and remaining production
 promotion work are under [`../docs/adlc/`](../docs/adlc/).
+
+## External Circle MCP
+
+The default `mcp_servers.json` starts a deterministic local stdio server. To
+keep those risk tools and also exercise a real external MCP integration, use
+Circle's official Streamable HTTP server with the additive configuration:
+
+```bash
+PYTHONPATH=agent-spine:circle-agent \
+  LLM_PROVIDER=openai \
+  OPENAI_BASE_URL=http://127.0.0.1:1234/v1 \
+  OPENAI_MODEL=local-model \
+  CIRCLE_MCP_CONFIG=circle-agent/mcp_servers.external.json \
+  .venv/bin/python circle-agent/serve.py
+```
+
+The external server exposes allowlisted, read-only tools for Circle
+documentation search, product summaries, and SDK coding resources. It does not
+read wallets or execute transactions. Use `full-testnet` when the same run must
+also exercise the separate Circle Wallet HTTPS API. HTTP proxy environment
+variables can route both external connections through a capture/replay proxy.
